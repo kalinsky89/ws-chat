@@ -1,28 +1,25 @@
-const WebSocket = require("ws");
-const http = require("http");
+const http = require('http');
+const StompServer = require('stomp-broker-js');
+const node_static = require('node-static');
+const static_directory = new node_static.Server(__dirname);
 
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { "Content-Type": "text/plain" });
-  res.end("WebSocket server is running");
+const server = http.createServer((request, response) => {
+  console.log(request.url);
+  static_directory.serve(request, response);
+});
+const stompServer = new StompServer({
+  server: server,
+  debug: console.log,
+  path: '/ws',
+  protocol: 'sockjs',
+  heartbeat: [2000, 2000]
 });
 
-const wss = new WebSocket.Server({ server });
+console.log(' [*] Listening on 0.0.0.0:3002');
+server.listen(3002, 'localhost');
 
-wss.on("connection", (ws, req) => {
-  ws.send("test -> ");
-  console.log("Client connected");
-
-  ws.on("message", (message) => {
-    console.log("Received message:", message);
-    ws.send(message);
-  });
-
-  ws.on("close", () => {
-    console.log("Client disconnected");
-  });
-});
-
-const port = 8080;
-server.listen(port, () => {
-  console.log(`WebSocket server is listening on port ${port}`);
+stompServer.subscribe('/echo', (msg, headers) => {
+  var topic = headers.destination;
+  console.log(`topic:${topic} messageType: ${typeof msg}, messageBody:`, msg);
+  stompServer.send('/echo', headers, `Hello from server! ${msg}`);
 });
